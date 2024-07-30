@@ -20,7 +20,9 @@ import { Dimension } from "./Dimension";
 import { Player } from "./Player";
 import { Tickable } from "./Tickable";
 import { MineBuffer, Vec2, Vec3 } from "../../native";
+import { FSWorldStorageProvider } from "../StorageProviders/FSWorldStorage";
 import { Chunk } from "../data/Chunk";
+import { WorldStorageProvider } from "../data/WorldStorageProvider";
 import {
   PlayClientboundChunkDataMessage,
   PlayClientboundChunkDataMessageOptions,
@@ -33,6 +35,9 @@ export interface WorldOptions {
   difficulty?: Difficulty;
   difficultyLocked?: boolean;
   isHardcore?: boolean;
+  name: string;
+  worldStorageProvider?: WorldStorageProvider;
+  savingInterval?: number;
 }
 
 export class World implements Tickable {
@@ -42,6 +47,10 @@ export class World implements Tickable {
   private _difficulty: Difficulty;
   public readonly difficultyLocked: boolean;
   public readonly isHardcore: boolean;
+  public readonly name: string;
+
+  public readonly worldStorageProvider?: WorldStorageProvider;
+  public readonly savingInterval: number;
 
   public get difficulty(): Difficulty {
     return this._difficulty;
@@ -55,11 +64,22 @@ export class World implements Tickable {
     void parallel(this.players(), player => player.sendDifficulty(difficulty));
   }
 
-  public constructor(server: Server, options: WorldOptions = {}) {
+  public constructor(
+    server: Server,
+    options: WorldOptions = {
+      name: "World",
+      worldStorageProvider: new FSWorldStorageProvider({
+        path: "worldData",
+      }),
+    },
+  ) {
     this.server = server;
     this._difficulty = options.difficulty ?? Difficulty.PEACEFUL;
     this.difficultyLocked = options.difficultyLocked ?? false;
     this.isHardcore = options.isHardcore ?? false;
+    this.savingInterval = options.savingInterval ?? 10000;
+    this.worldStorageProvider = options.worldStorageProvider;
+    this.name = options.name;
 
     this.sendWolrd();
   }
@@ -73,19 +93,22 @@ export class World implements Tickable {
       WORLD_SURFACE: new Array(37).fill(BigInt(0n)), // Altura do bloco (simplificado)
     };
 
-    const chunkData = new Chunk({});
+    const chunkData = new Chunk({
+      minY: -64,
+      worldHeight: 384,
+    });
 
-    for (let x = 0; x < 16; x++) {
-      for (let z = 0; z < 16; z++) {
-        for (let y = 0; y < 255; y++) {
-          chunkData.setBlockType(new Vec3(x, y, z), ((x + y) % 4) + 1);
+    for (let y = -64; y < 77 - 64; y++) {
+      for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+          chunkData.setBlockType(new Vec3(x, y, z), 1);
           chunkData.setBlockLight(new Vec3(x, y, z), 15);
-          // chunkData.setSkyLight(new Vec3(x, y, z), 15);
+          chunkData.setBiome(new Vec3(x, y, z), 1);
         }
       }
     }
 
-    const trustEdges = true;
+    const trustEdges = false;
     const skyLightMask = 0x0; // Para simplificação, não há dados de luz
     const blockLightMask = 0x0; // Para simplificação, não há dados de luz
     const emptySkyLightMask = 0x0; // Para simplificação, não há dados de luz
@@ -108,12 +131,20 @@ export class World implements Tickable {
 
     const buffer = new MineBuffer();
     pp.encode(buffer);
-    writeFileSync("testeChunk.data", buffer.getBuffer());
+    writeFileSync("debug/testeChunk.dat", buffer.getBuffer());
+    writeFileSync("debug/chunkDump/testeChunk.dat", buffer.getBuffer());
     // await this.connection.writeMessage();
   }
 
-  public init(): void {
-    void 0;
+  public async init(): Promise<void> {
+    if (this.worldStorageProvider) {
+      const dis = await this.worldStorageProvider.loadDimensions(this);
+      dis.forEach(e => this.dimensions.add(e));
+    } else {
+      // TODO: temporary
+      const mainWorldOverworld = new Dimension(this, { name: "overworld" });
+      this.dimensions.add(mainWorldOverworld);
+    }
   }
 
   public end(): void {

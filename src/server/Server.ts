@@ -93,8 +93,6 @@ export default class Server extends EventEmitter<{
     // TODO: this is temporary
     const mainWorld = new World(this);
     this.worlds.add(mainWorld);
-    const mainWorldOverworld = new Dimension(mainWorld, "overworld");
-    mainWorld.dimensions.add(mainWorldOverworld);
 
     // Bind events
     this.tcpServer.on("connection", this._onSocketConnect.bind(this));
@@ -139,7 +137,7 @@ export default class Server extends EventEmitter<{
     }
   }
 
-  public start(): void {
+  public async start(): Promise<void> {
     // Display license message
     this.logger.info(`MineNode ${MINENODE_VERSION} - implementing MC ${GAME_VERSION} (${PROTOCOL_VERSION})`);
     this.logger.info(`Copyright (C) ${new Date().getFullYear()} MineNode. All rights reserved.`);
@@ -147,6 +145,9 @@ export default class Server extends EventEmitter<{
 
     this.loadServerIcon();
     this.generateKeyPair();
+
+    // TODO: init worlds - I don't know if you need to stay here
+    await parallel(this.worlds.values(), e => e.init());
 
     // TODO: load from config
     this.tcpServer.listen(25565, "0.0.0.0");

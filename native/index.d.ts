@@ -35,38 +35,22 @@ export class MineBuffer {
   readPosition(): Vec3;
   readUUID(): string;
   writeBytes(buf: Buffer): void;
-  // 1 bytes
   writeUByte(val: number): void;
-  // 1 bytes
   writeByte(val: number): void;
-  //** 1 bytes */
-  writeShort(val: number): void;
-  // 2 bytes
-  writeUShort(val: number): void;
-  // 2 bytes
   writeBoolean(val: boolean): void;
-  // 4 bytes
   writeFloat(val: number): void;
-  // 4 bytes
-  writeInt(val: number): void;
-  // 4 bytes
-  writeUInt(val: number): void;
-  // 8 bytes
   writeDouble(val: number): void;
-  // 8 bytes
+  writeInt(val: number): void;
+  writeUInt(val: number): void;
   writeLong(val: bigint): void;
-  // ≥ 1 ≤ 5 bytes
-  writeVarInt(val: number): void;
-  // ≥ 1 ≤ 10 bytes
-  writeVarLong(val: bigint): void;
-  // 16 bytes
-  writeUUID(val: string): void;
-  // 8 bytes
   writePosition(val: Vec3): void;
-  // ≥ 1 ≤ (n×4) + 3 bytes
+  writeUUID(val: string): void;
+  writeShort(val: number): void;
+  writeUShort(val: number): void;
+  writeVarInt(val: number): void;
+  writeVarLong(val: bigint): void;
   writeString(val: string): void;
 }
-
 export class Vec2 {
   x: number;
   y: number;
@@ -84,7 +68,6 @@ export class Vec2 {
   normalize(): void;
   distance(other: Vec2): number;
 }
-
 export class Vec3 {
   x: number;
   y: number;
@@ -103,7 +86,6 @@ export class Vec3 {
   normalize(): void;
   distance(other: Vec3): number;
 }
-
 export class Vec5 {
   x: number;
   y: number;

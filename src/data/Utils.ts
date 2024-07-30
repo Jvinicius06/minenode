@@ -14,7 +14,7 @@ export function getLightSectionIndex(pos: Vec3, minY: number) {
 }
 
 export function toBiomePos(pos: Vec3, minY: number) {
-  return { x: pos.x >> 2, y: ((pos.y - minY) & 0xf) >> 2, z: pos.z >> 2 };
+  return new Vec3(pos.x >> 2, ((pos.y - minY) & 0xf) >> 2, pos.z >> 2);
 }
 
 export function toSectionPos(pos: Vec3, minY: number) {

@@ -20,10 +20,12 @@ export class ChunkSection {
   public singleValue?: number;
   public solidBlockCount: number;
   public palette?: Array<number>;
+
   public constructor(options: ChunkSessionConfig) {
     if (options.data) {
       this.data = options.data;
       this.solidBlockCount = options.solidBlockCount ?? 0;
+
       if (!options.solidBlockCount) {
         for (let i = 0; i < BLOCK_SECTION_VOLUME; ++i) {
           if (this.data.get(i)) {
@@ -33,6 +35,7 @@ export class ChunkSection {
       }
     } else {
       const value = options.singleValue ?? 0;
+
       this.data = new SingleValueContainer({
         value,
         bitsPerValue: MIN_BITS_PER_BLOCK,

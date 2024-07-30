@@ -31,11 +31,10 @@ export default class MessageHandlerFactory {
 
     const messagesModules = messagesFiles
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-      .map(file => require(path.resolve(file))?.selfRegisterMessageHandler as ((server: Server) => MessageHandler) | undefined)
-      .filter(e => e !== undefined);
+      .map(file => require(path.resolve(file))?.selfRegisterMessageHandler as ((server: Server) => MessageHandler) | undefined);
 
     messagesModules.forEach(moduleHandles => {
-      this.registered.add(moduleHandles(this.server));
+      if (moduleHandles) this.registered.add(moduleHandles(this.server));
     });
   }
 

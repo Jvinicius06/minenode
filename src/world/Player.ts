@@ -15,9 +15,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { readFile } from "fs/promises";
 import { Dimension } from "./Dimension";
 import { Entity } from "./Entity";
-import { Vec3, Vec5 } from "../../native";
+import { MineBuffer, Vec3, Vec5 } from "../../native";
+import codecDef from "../assets/codec";
 import { int, float, double } from "../data/NBT";
 import { PlayClientboundChatMessage } from "../net/protocol/messages/play/clientbound/PlayClientboundChatMessage";
 import { PlayClientboundEntityStatusMessage } from "../net/protocol/messages/play/clientbound/PlayClientboundEntityStatusMessage";
@@ -100,6 +102,10 @@ export class Player extends Entity {
   public get maxDistancePerTick(): number {
     return 1.4 / 20;
   }
+
+  // TODO: implement this method
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+  public sendChunks(_chunkX: number, _chunkZ: number) {}
 
   public async setPositionChecked(position: Vec5, onGround: boolean): Promise<void> {
     // const distance = this._position.distance(position);
@@ -204,79 +210,23 @@ export class Player extends Entity {
           gamemode: GameMode.CREATIVE, // TODO
           previousGameMode: GameMode.NONE,
           worlds: ["minecraft:overworld"],
-          dimensionCodec: {
-            "minecraft:dimension_type": {
-              type: "minecraft:dimension_type",
-              value: [
-                {
-                  element: {
-                    ambient_light: float(0.0),
-                    bed_works: true,
-                    coordinate_scale: double(1.0),
-                    effects: "minecraft:overworld",
-                    has_ceiling: false,
-                    has_raids: true,
-                    has_skylight: true,
-                    height: int(256),
-                    infiniburn: "#minecraft:infiniburn_overworld",
-                    logical_height: int(256),
-                    min_y: int(0),
-                    natural: true,
-                    piglin_safe: false,
-                    respawn_anchor_works: false,
-                    ultrawarm: false,
-                  },
-                  id: int(0),
-                  name: "minecraft:overworld",
-                },
-              ],
-            },
-            "minecraft:worldgen/biome": {
-              type: "minecraft:worldgen/biome",
-              value: [
-                {
-                  element: {
-                    category: "plains",
-                    downfall: float(0.4),
-                    effects: {
-                      sky_color: int(7907327),
-                      water_fog_color: int(329011),
-                      fog_color: int(12638463),
-                      water_color: int(4159204),
-                      mood_sound: {
-                        tick_delay: int(6000),
-                        offset: double(2.0),
-                        sound: "minecraft:ambient.cave",
-                        block_search_extent: int(8),
-                      },
-                    },
-                    depth: float(0.125),
-                    precipitation: "rain",
-                    temperature: float(0.8),
-                    scale: float(0.05),
-                  },
-                  id: int(1),
-                  name: "minecraft:plains",
-                },
-              ],
-            },
-          },
+          dimensionCodec: codecDef,
           dimension: {
-            piglin_safe: false, // TODO: implicitly convert boolean to byte
-            natural: true,
-            ambient_light: float(1.0),
             infiniburn: "#minecraft:infiniburn_overworld",
-            respawn_anchor_works: false,
-            has_skylight: true,
-            bed_works: true,
             effects: "minecraft:overworld",
-            has_raids: true,
-            min_y: int(0),
-            height: int(256),
-            logical_height: int(256),
-            coordinate_scale: double(1.0),
             ultrawarm: false,
+            logical_height: int(384),
+            height: int(384),
+            natural: true,
+            min_y: int(-64),
+            bed_works: true,
+            coordinate_scale: double(1),
+            piglin_safe: false,
+            has_skylight: true,
             has_ceiling: false,
+            ambient_light: float(0),
+            has_raids: true,
+            respawn_anchor_works: false,
           },
           worldName: "minecraft:overworld",
           hashedSeed: 1n,
@@ -285,7 +235,7 @@ export class Player extends Entity {
           simulationDistance: 32,
           reducedDebugInfo: false,
           enableRespawnScreen: false,
-          isDebug: true,
+          isDebug: false,
           isFlat: false,
         });
         await this.connection.writeMessage(joinGameResponse);
@@ -302,13 +252,13 @@ export class Player extends Entity {
         await this.connection.writeMessage(
           new PlayClientboundEntityStatusMessage({
             entityId: this.entityId,
-            status: AllEntityStatus.PLAYER__SET_OP_PERMISSION_4, // TODO: read from config, validate, etc.
+            status: AllEntityStatus.PLAYER__SET_OP_PERMISSION_1, // TODO: read from config, validate, etc.
           }),
         );
         // TODO: refactor to set position()
         await this.connection.writeMessage(
           new PlayClientboundPositionAndLookMessage({
-            position: new Vec5(0, 500, 0, 0, 0),
+            position: new Vec5(0, 270, 0, 0, 0),
             flags: {
               x: false,
               y: false,
@@ -328,6 +278,10 @@ export class Player extends Entity {
           },
           ClientChatPosition.SYSTEM_MESSAGE,
         );
+
+        // TODO: temporary send chunk data from test
+        const r = await readFile("debug/testeChunk.dat");
+        void this.connection.write(0x22, new MineBuffer(r));
 
         break;
       }

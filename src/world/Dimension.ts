@@ -22,17 +22,41 @@ import { WithUniqueId } from "./WithUniqueId";
 import { WorldMember, World } from "./World";
 import Server from "../server/Server";
 
+export interface DimensionConfig {
+  name: string;
+  uuid?: string;
+  seed?: number;
+}
+
 export class Dimension implements Tickable, WorldMember, WithUniqueId {
   public readonly world: World;
   public readonly name: string;
   public readonly uuid: string;
+  public readonly seed: number;
 
   public readonly players: Set<Player> = new Set();
 
-  public constructor(world: World, name: string, uuid: string = uuidlib.v4()) {
+  public constructor(world: World, options: DimensionConfig) {
     this.world = world;
-    this.name = name;
-    this.uuid = uuid;
+    this.name = options.name;
+    this.uuid = options.uuid ?? uuidlib.v4();
+    this.seed = options.seed ?? Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+  }
+
+  public static from(world: World, json: DimensionConfig) {
+    return new Dimension(world, {
+      name: json.name,
+      seed: json.seed,
+      uuid: json.uuid,
+    });
+  }
+
+  public toJSON(): Required<DimensionConfig> {
+    return {
+      name: this.name,
+      seed: this.seed,
+      uuid: this.uuid,
+    };
   }
 
   public init(): Promise<void> {

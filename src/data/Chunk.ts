@@ -4,11 +4,12 @@ import { BiomeSection } from "./BiomeSection";
 import { BitArray } from "./BitArray";
 import { Block } from "./Block";
 import { ChunkSection } from "./ChunkSection";
-import { getLightSectionIndex, getSectionBlockIndex, toSectionPos } from "./Utils";
+import { getLightSectionIndex, getSectionBlockIndex, toBiomePos, toSectionPos } from "./Utils";
 import { MineBuffer, Vec3 } from "../../native";
 import { GAME_VERSION } from "../utils/Constants";
 
 export const mcData = MinecraftData(GAME_VERSION);
+
 // Adapted from:
 // https://github.com/PrismarineJS/prismarine-chunk/blob/3e617d8e39ed9863c46fe99c296eef82fc9eabaa/src/pc/1.16/ChunkColumn.js
 // License: MIT
@@ -51,8 +52,10 @@ export class Chunk {
       () =>
         new ChunkSection({
           bitsPerBlock: 15,
+          singleValue: 0, // air block
         }),
     );
+
     this.biomes = Array.from<BiomeSection>({
       length: this.numSections,
     }).map(
@@ -89,9 +92,9 @@ export class Chunk {
     if (typeof block.stateId !== "undefined") {
       this.setBlockStateId(pos, block.stateId);
     }
-    if (typeof block.biomeId !== "undefined") {
-      // this.setBiome(pos, block.biomeId);
-    }
+    // if (typeof block.biomeId !== "undefined") {
+    // this.setBiome(pos, block.biomeId);
+    // }
     // if (typeof block.skyLight !== "undefined") {
     //   this.setSkyLight(pos, block.skyLight);
     // }
@@ -107,7 +110,8 @@ export class Chunk {
   }
 
   public setBlockType(pos: Vec3, id: number) {
-    const stateId = mcData.blocks[id].minStateId;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const stateId = mcData.blocks[id]?.minStateId;
     if (stateId) {
       this.setBlockStateId(pos, stateId);
     }
@@ -132,11 +136,18 @@ export class Chunk {
         bitsPerValue: 4,
         capacity: 4096,
       });
-      this.skyLightMask.set(sectionIndex, 1);
+      // this.skyLightMask.set(sectionIndex, 1);
       this.skyLightSections[sectionIndex] = section;
     }
 
     section.set(getSectionBlockIndex(pos, this.minY), light);
+  }
+
+  public setBiome(pos: Vec3, biomeId: number) {
+    const biome = this.biomes[(pos.y - this.minY) >> 4];
+    if (biome) {
+      biome.set(toBiomePos(pos, this.minY), biomeId);
+    }
   }
 
   public setBlockLight(pos: Vec3, light: number) {
@@ -153,7 +164,6 @@ export class Chunk {
         capacity: 4096,
       });
       if (sectionIndex > this.blockLightMask.capacity) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         this.blockLightMask = this.blockLightMask.resize(sectionIndex);
       }
       this.blockLightMask.set(sectionIndex, 1);
@@ -169,10 +179,6 @@ export class Chunk {
       if (this.sections[i]) {
         this.sections[i]?.write(tempBUF);
         this.biomes[i]?.write(tempBUF);
-        // TODO: PALLET BIOMES Ignore
-        // tempBUF.writeByte(0);
-        // tempBUF.writeVarInt(1);
-        // tempBUF.writeByte(0);
       }
     }
     const buf = tempBUF.getBuffer();
@@ -191,15 +197,15 @@ export class Chunk {
     buffer.writeVarInt(this.emptyBlockLightMask.size());
     this.emptyBlockLightMask.writeBuffer(buffer);
 
-    buffer.writeVarInt(0);
-    // buffer.writeVarInt(this.skyLightSections.length);
-    // this.skyLightSections.forEach((section, index) => {
-    //   if (section !== null && this.skyLightMask.get(index)) {
-    //     console.log(section.size());
-    //     buffer.writeVarInt(section.size());
-    //     section.writeBuffer(buffer);
-    //   }
-    // });
+    // buffer.writeVarInt(0);
+    buffer.writeVarInt(this.skyLightSections.length);
+    this.skyLightSections.forEach((section, index) => {
+      if (section !== null && this.skyLightMask.get(index)) {
+        // console.log(section.size());
+        buffer.writeVarInt(2048);
+        section.writeBuffer(buffer);
+      }
+    });
     buffer.writeVarInt(this.blockLightSections.length);
     this.blockLightSections.forEach((section, index) => {
       if (section !== null && this.blockLightMask.get(index)) {

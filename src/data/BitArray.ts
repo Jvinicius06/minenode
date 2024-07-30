@@ -70,7 +70,7 @@ export class BitArray implements BitArrayBase {
     });
     for (let i = 0; i < this.capacity; i++) {
       const value = this.get(i);
-      if (Math.clz32(value) > newBitsPerValue) {
+      if (Math.clz32(value) < newBitsPerValue) {
         throw new RangeError(`Value ${value} is too large for ${newBitsPerValue} bits`);
       }
       newArray.set(i, value);
