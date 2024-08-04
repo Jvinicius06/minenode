@@ -1,5 +1,5 @@
 /* eslint-disable license-header/header */
-import { PaletteBase, SingleValueContainer } from "./Palette";
+import { PaletteBase, palletFromJSON, SingleValueContainer } from "./Palette";
 import { getBiomeIndex } from "./Utils";
 import { MineBuffer, Vec3 } from "../../native";
 import { BIOME_SECTION_VOLUME, MAX_BITS_PER_BIOME, MIN_BITS_PER_BIOME } from "../utils/Constants";
@@ -32,5 +32,15 @@ export class BiomeSection {
 
   public write(buffer: MineBuffer) {
     this.data.write(buffer);
+  }
+
+  public toJson() {
+    return this.data.toJson();
+  }
+
+  public static fromJson(data: ReturnType<BiomeSection["toJson"]>): BiomeSection {
+    return new BiomeSection({
+      data: palletFromJSON(data),
+    });
   }
 }

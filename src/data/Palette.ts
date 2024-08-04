@@ -16,6 +16,7 @@ export interface PaletteBase {
   get(index: number): number;
   set(index: number, value: number): PaletteBase;
   write(buffer: MineBuffer): void;
+  toJson(): JsonPalette;
 }
 
 interface SingleValueContainerConfig {
@@ -33,6 +34,11 @@ interface IndirectPaletteContainerConfig {
   palette?: Array<number>;
   maxBits?: number;
   maxBitsPerBlock?: number;
+}
+
+export interface JsonPalette extends SingleValueContainerConfig, Omit<IndirectPaletteContainerConfig, "data"> {
+  type: string;
+  data?: ReturnType<BitArray["toJson"]>;
 }
 
 class DirectPaletteContainer implements PaletteBase {
@@ -66,9 +72,17 @@ class DirectPaletteContainer implements PaletteBase {
   }
 
   public write(buffer: MineBuffer) {
-    buffer.writeUByte(this.data.bitsPerValue);
+    // buffer.writeUByte(this.data.bitsPerValue);
     buffer.writeVarInt(this.data.size());
     this.data.writeBuffer(buffer);
+  }
+
+  public toJson(): JsonPalette {
+    return {
+      type: "drc",
+      bitsPerValue: this.data.bitsPerValue,
+      capacity: this.data.capacity,
+    };
   }
 }
 
@@ -139,6 +153,16 @@ export class IndirectPaletteContainer implements PaletteBase {
     buffer.writeVarInt(this.data.size());
     this.data.writeBuffer(buffer);
   }
+
+  public toJson(): JsonPalette {
+    return {
+      type: "ind",
+      bitsPerValue: this.data.bitsPerValue,
+      capacity: this.data.capacity,
+      palette: this.palette,
+      data: this.data.toJson(),
+    };
+  }
 }
 
 export class SingleValueContainer implements PaletteBase {
@@ -189,4 +213,29 @@ export class SingleValueContainer implements PaletteBase {
     buffer.writeVarInt(this.value);
     buffer.writeByte(0);
   }
+
+  public toJson(): JsonPalette {
+    return {
+      type: "sig",
+      value: this.value,
+      bitsPerValue: this.bitsPerValue,
+      capacity: this.capacity,
+    };
+  }
 }
+
+export const palletFromJSON = (json: JsonPalette): PaletteBase => {
+  // console.log(json);
+  const { data, ...rest } = json;
+  const palette = data ? { ...rest, data: BitArray.from(data) } : rest;
+  switch (json.type) {
+    case "drc":
+      return new DirectPaletteContainer(palette);
+    case "ind":
+      return new IndirectPaletteContainer(palette);
+    case "sig":
+      return new SingleValueContainer(json);
+    default:
+      throw new Error(`Unknown palette type ${json.type}`);
+  }
+};

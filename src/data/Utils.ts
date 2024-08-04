@@ -10,7 +10,7 @@ export function neededBits(value: number) {
 }
 
 export function getLightSectionIndex(pos: Vec3, minY: number) {
-  return Math.floor((pos.y - minY) / 16);
+  return Math.floor((pos.y - minY) / 16) + 1;
 }
 
 export function toBiomePos(pos: Vec3, minY: number) {

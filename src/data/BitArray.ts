@@ -13,6 +13,7 @@ export interface BitArrayOptions {
   data?: Uint32Array;
   capacity: number;
   bitsPerValue: number;
+  value?: number;
 }
 
 export interface BitArrayBase {
@@ -31,10 +32,21 @@ export class BitArray implements BitArrayBase {
     const data = options.data ?? new Uint32Array(size).fill(0);
     const valueMask = (1 << options.bitsPerValue) - 1;
 
-    this.data = Uint32Array.from(data);
+    this.data = data;
     this.capacity = options.capacity;
     this.bitsPerValue = options.bitsPerValue;
     this.valueMask = valueMask;
+
+    if (options.value !== undefined) {
+      this.fill(options.value);
+    }
+  }
+
+  // TODO: optimeze this method
+  public fill(value: number): void {
+    for (let i = 0; i < this.capacity; i++) {
+      this.set(i, value);
+    }
   }
 
   public get(index: number): number {
@@ -94,6 +106,10 @@ export class BitArray implements BitArrayBase {
     return Math.ceil(this.data.length / 2);
   }
 
+  public sizeInBytes(): number {
+    return (this.data.length * this.bitsPerValue) / 8;
+  }
+
   public readBuffer(buffer: MineBuffer): this {
     for (let i = 0; i < this.data.length; i += 2) {
       this.data[i + 1] = buffer.readUInt();
@@ -119,20 +135,21 @@ export class BitArray implements BitArrayBase {
     return `BitArray(capacity=${this.capacity}, bitsPerValue=${this.bitsPerValue}, len=${this.data.length})`;
   }
 
-  public toJSON(): BitArrayOptions {
+  public toJson() {
     return {
       capacity: this.capacity,
       bitsPerValue: this.bitsPerValue,
-      data: new Uint32Array(this.data),
+      data: Array.from(new Uint32Array(this.data)),
     };
   }
 
-  public static from(json: BitArrayOptions): BitArray {
-    return new BitArray({
+  public static from(json: ReturnType<BitArray["toJson"]>): BitArray {
+    const bit = new BitArray({
       capacity: json.capacity,
       bitsPerValue: json.bitsPerValue,
-      data: json.data,
+      data: new Uint32Array(json.data),
     });
+    return bit;
   }
 
   public static fromArray(array: ReadWriteArrayLike<number>, bitsPerValue: number): BitArray {
@@ -154,7 +171,7 @@ export class BitArray implements BitArrayBase {
       data.push(curLong);
     }
     return new BitArray({
-      capacity: array.length,
+      capacity: (array.length * 32) / bitsPerValue,
       bitsPerValue,
       data: new Uint32Array(data), // TODO: this is copying the array, may be inefficient
     });

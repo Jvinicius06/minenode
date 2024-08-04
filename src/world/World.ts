@@ -15,18 +15,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { writeFileSync } from "fs";
 import { Dimension } from "./Dimension";
 import { Player } from "./Player";
 import { Tickable } from "./Tickable";
-import { MineBuffer, Vec2, Vec3 } from "../../native";
 import { FSWorldStorageProvider } from "../StorageProviders/FSWorldStorage";
-import { Chunk } from "../data/Chunk";
 import { WorldStorageProvider } from "../data/WorldStorageProvider";
-import {
-  PlayClientboundChunkDataMessage,
-  PlayClientboundChunkDataMessageOptions,
-} from "../net/protocol/messages/play/clientbound/PlayClientboundChunkDataMessage";
 import Server from "../server/Server";
 import { Difficulty } from "../utils/Enums";
 import { parallel } from "../utils/SetUtils";
@@ -49,7 +42,7 @@ export class World implements Tickable {
   public readonly isHardcore: boolean;
   public readonly name: string;
 
-  public readonly worldStorageProvider?: WorldStorageProvider;
+  public readonly worldStorageProvider: WorldStorageProvider;
   public readonly savingInterval: number;
 
   public get difficulty(): Difficulty {
@@ -68,9 +61,6 @@ export class World implements Tickable {
     server: Server,
     options: WorldOptions = {
       name: "World",
-      worldStorageProvider: new FSWorldStorageProvider({
-        path: "worldData",
-      }),
     },
   ) {
     this.server = server;
@@ -78,68 +68,20 @@ export class World implements Tickable {
     this.difficultyLocked = options.difficultyLocked ?? false;
     this.isHardcore = options.isHardcore ?? false;
     this.savingInterval = options.savingInterval ?? 10000;
-    this.worldStorageProvider = options.worldStorageProvider;
-    this.name = options.name;
-
-    this.sendWolrd();
-  }
-
-  public sendWolrd() {
-    // Exemplo de criação de um Chunk com uma camada de terra (dirt)
-    const chunkLocation: Vec2 = new Vec2(0, 0);
-    // Dados de altura do Chunk (simplificado)
-    const heightMap = {
-      MOTION_BLOCKING: new Array(37).fill(BigInt(0n)), // Altura do bloco (simplificado)
-      WORLD_SURFACE: new Array(37).fill(BigInt(0n)), // Altura do bloco (simplificado)
-    };
-
-    const chunkData = new Chunk({
-      minY: -64,
-      worldHeight: 384,
-    });
-
-    for (let y = -64; y < 77 - 64; y++) {
-      for (let x = 0; x < 16; x++) {
-        for (let z = 0; z < 16; z++) {
-          chunkData.setBlockType(new Vec3(x, y, z), 1);
-          chunkData.setBlockLight(new Vec3(x, y, z), 15);
-          chunkData.setBiome(new Vec3(x, y, z), 1);
-        }
-      }
+    if (options.worldStorageProvider instanceof FSWorldStorageProvider) {
+      this.worldStorageProvider = options.worldStorageProvider;
+    } else {
+      this.worldStorageProvider = new FSWorldStorageProvider({
+        path: "worldData",
+      });
     }
-
-    const trustEdges = false;
-    const skyLightMask = 0x0; // Para simplificação, não há dados de luz
-    const blockLightMask = 0x0; // Para simplificação, não há dados de luz
-    const emptySkyLightMask = 0x0; // Para simplificação, não há dados de luz
-    const emptyBlockLightMask = 0x0; // Para simplificação, não há dados de luz
-    const skyLight = new Uint8Array(2048).fill(0); // Para simplificação, todos os bits de luz são 1
-    const blockLight = new Uint8Array(2048).fill(0); // Para simplificação, todos os bits de luz são 1
-    const chunkDataPacket: PlayClientboundChunkDataMessageOptions = {
-      chunkLocation,
-      heightMap,
-      data: chunkData,
-      trustEdges,
-      skyLightMask,
-      blockLightMask,
-      emptySkyLightMask,
-      emptyBlockLightMask,
-      skyLight,
-      blockLight,
-    };
-    const pp = new PlayClientboundChunkDataMessage(chunkDataPacket);
-
-    const buffer = new MineBuffer();
-    pp.encode(buffer);
-    writeFileSync("debug/testeChunk.dat", buffer.getBuffer());
-    writeFileSync("debug/chunkDump/testeChunk.dat", buffer.getBuffer());
-    // await this.connection.writeMessage();
+    this.name = options.name;
   }
 
   public async init(): Promise<void> {
-    if (this.worldStorageProvider) {
-      const dis = await this.worldStorageProvider.loadDimensions(this);
-      dis.forEach(e => this.dimensions.add(e));
+    const dismensions = await this.worldStorageProvider.loadDimensions(this);
+    if (dismensions.length > 0) {
+      dismensions.forEach(e => this.dimensions.add(e));
     } else {
       // TODO: temporary
       const mainWorldOverworld = new Dimension(this, { name: "overworld" });
@@ -147,11 +89,15 @@ export class World implements Tickable {
     }
   }
 
-  public end(): void {
-    void 0;
+  public async end(): Promise<void> {
+    this.server.logger.info(`Ending world ${this.name}`);
+    await parallel(this.dimensions, dimension => dimension.end());
   }
 
   public async tick(tick: number): Promise<void> {
+    for (const dimension of this.dimensions) {
+      await dimension.tick(tick);
+    }
     await Promise.resolve(void tick);
   }
 

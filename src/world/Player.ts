@@ -15,10 +15,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { readFile } from "fs/promises";
+import util from "util";
 import { Dimension } from "./Dimension";
 import { Entity } from "./Entity";
-import { MineBuffer, Vec3, Vec5 } from "../../native";
+import { Vec3, Vec5 } from "../../native";
 import codecDef from "../assets/codec";
 import { int, float, double } from "../data/NBT";
 import { PlayClientboundChatMessage } from "../net/protocol/messages/play/clientbound/PlayClientboundChatMessage";
@@ -52,13 +52,13 @@ export class Player extends Entity {
   private _username: string | null = null;
 
   public get username(): string {
-    if (this._username === null) throw new Error("Player.username is not set");
-    return this._username;
+    // if (this._username === null) throw new Error("Player.username is not set");
+    return this._username ?? "unknown";
   }
 
-  public set username(username: string) {
-    if (!/^[a-zA-Z0-9_]{2,16}$/.test(username)) throw new Error(`Invalid username ${username}`);
-    this._username = username;
+  public set username(usernameInput: string) {
+    if (!/^[a-zA-Z0-9_]{2,16}$/.test(usernameInput)) throw new Error(`Invalid username ${usernameInput}`);
+    this._username = usernameInput;
   }
 
   private _hotbarSlot: InventoryHotbarSlot = InventoryHotbarSlot.SLOT_1;
@@ -69,6 +69,35 @@ export class Player extends Entity {
 
   public set hotbarSlot(slot: InventoryHotbarSlot) {
     void this.setHotbarSlotAsync(slot);
+  }
+
+  public load() {
+    // Bind connection events
+    this.connection.on("disconnect", () => {
+      this.server.logger.debug(`${this.connection.remote}: disconnected`);
+      this.dimension.players.delete(this);
+      void this.end();
+    });
+
+    this.connection.on("message", msg => {
+      const handler = this.server.handlerFactory.getHandler(msg.packetID, this.connection.state);
+
+      if (handler) {
+        try {
+          handler.handle(msg.payload, this);
+        } catch (err) {
+          this.server.logger.error(util.inspect(err));
+          void this.connection.disconnect({ text: String(err), color: "red" });
+        }
+      } else {
+        // TODO handle
+        this.server.logger.error(
+          `${this.connection.remote}: invalid message (state = ${ConnectionState[this.connection.state]} [${this.connection.state}]), id = ${
+            msg.packetID
+          } / 0x${msg.packetID.toString(16).padStart(2, "0")})`,
+        );
+      }
+    });
   }
 
   public async setHotbarSlotAsync(slot: InventoryHotbarSlot): Promise<void> {
@@ -117,6 +146,10 @@ export class Player extends Entity {
   public async setPositionUnchecked(position: Vec5, onGround: boolean): Promise<void> {
     if (this.connection.state !== ConnectionState.PLAY)
       throw new Error(`Player.setPositionUnchecked can only be called in PLAY state, but is called in ${ConnectionState[this.connection.state]}`);
+    if (this._position.toVec3().x !== position.toVec3().x || this._position.toVec3().z !== position.toVec3().z) {
+      await this.dimension.updatePlayerPosition(this, position);
+    }
+
     this._position = position;
     this._isOnGround = onGround;
     this._lastPositionOnGround = onGround ? position : null;
@@ -149,9 +182,6 @@ export class Player extends Entity {
       if (this._isOnGround) {
         this._lastTickOnGround = tick;
         this._lastPositionOnGround = this._position.toVec3();
-      }
-      if (tick - this._lastTickOnGround > 20 * 10) {
-        // await this.disconnect("Player is not on ground");
       }
     }
   }
@@ -279,9 +309,7 @@ export class Player extends Entity {
           ClientChatPosition.SYSTEM_MESSAGE,
         );
 
-        // TODO: temporary send chunk data from test
-        const r = await readFile("debug/testeChunk.dat");
-        void this.connection.write(0x22, new MineBuffer(r));
+        await this.dimension.updatePlayerPosition(this, new Vec5(0, 270, 0, 0, 0));
 
         break;
       }

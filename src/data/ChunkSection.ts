@@ -1,7 +1,7 @@
 /* eslint-disable license-header/header */
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 
-import { PaletteBase, SingleValueContainer } from "./Palette";
+import { PaletteBase, palletFromJSON, SingleValueContainer } from "./Palette";
 import { getBlockIndex } from "./Utils";
 import { MineBuffer, Vec3 } from "../../native";
 import { BLOCK_SECTION_VOLUME, GLOBAL_BITS_PER_BLOCK, MAX_BITS_PER_BLOCK, MIN_BITS_PER_BLOCK } from "../utils/Constants";
@@ -73,5 +73,21 @@ export class ChunkSection {
   public write(buffer: MineBuffer) {
     buffer.writeShort(this.solidBlockCount);
     this.data.write(buffer);
+  }
+
+  public toJson() {
+    return {
+      solidBlockCount: this.solidBlockCount,
+      palette: this.palette,
+      data: this.data.toJson(),
+    };
+  }
+
+  public static fromJson(data: ReturnType<ChunkSection["toJson"]>): ChunkSection {
+    return new ChunkSection({
+      solidBlockCount: data.solidBlockCount,
+      data: palletFromJSON(data.data),
+      palette: data.palette,
+    });
   }
 }
